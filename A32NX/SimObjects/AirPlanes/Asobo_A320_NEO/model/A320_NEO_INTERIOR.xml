@@ -491,14 +491,14 @@
                 <ANIM_NAME>throttle_lever_0</NODE_ID>
                 <ID>1</ID>
                 <ANIM_NAME_REVERSE_LOCK>LEVER_THROTTLE_1_LOCK</ANIM_NAME_REVERSE_LOCK>
-                <TOOLTIP_ID>TT:COCKPIT.TOOLTIPS.ENG1_THROTTLE_CONTROL</TOOLTIP_ID>
+                <TOOLTIPID>TT:COCKPIT.TOOLTIPS.ENG1_THROTTLE_CONTROL</TOOLTIPID>
             </UseTemplate>
             <UseTemplate Name="FBW_Throttle_Lever_Template">
                 <NODE_ID>LEVER_THROTTLE_2</NODE_ID>
                 <ANIM_NAME>throttle_lever_1</NODE_ID>
                 <ID>2</ID>
                 <ANIM_NAME_REVERSE_LOCK>LEVER_THROTTLE_2_LOCK</ANIM_NAME_REVERSE_LOCK>
-                <TOOLTIP_ID>TT:COCKPIT.TOOLTIPS.ENG2_THROTTLE_CONTROL</TOOLTIP_ID>
+                <TOOLTIPID>TT:COCKPIT.TOOLTIPS.ENG2_THROTTLE_CONTROL</TOOLTIPID>
             </UseTemplate>
 
             <UseTemplate Name="FBW_AutoThrottle_Instinctive_Disconnect_Template">
@@ -2803,13 +2803,15 @@
                 <TOOLTIPID>%((L:XMLVAR_Autopilot_2_Status, bool))%{if}TT:COCKPIT.TOOLTIPS.AUTOPILOT_PANEL_AP_ON%{else}TT:COCKPIT.TOOLTIPS.AUTOPILOT_PANEL_AP_OFF%{end}</TOOLTIPID>
             </UseTemplate>
 
-            <UseTemplate Name="ASOBO_AUTOPILOT_Push_AutoThrottle_Template">
+            <UseTemplate Name="FBW_Push_Toggle">
                 <NODE_ID>PUSH_AUTOPILOT_ATHR</NODE_ID>
-                <ANIM_NAME>PUSH_AUTOPILOT_ATHR</ANIM_NAME>
+                <SEQ1_CODE>(L:A32NX_AUTOTHROTTLE_ARMED,Bool)</SEQ1_CODE>
+                <SEQ2_CODE>(A:LIGHT POTENTIOMETER:84,percent)</SEQ2_CODE>
                 <POTENTIOMETER>84</POTENTIOMETER>
-                <ACTIVE_NODE_ID>PUSH_AUTOPILOT_ATHR_SEQ1</ACTIVE_NODE_ID>
-                <EMISSIVE_NODE_ID>PUSH_AUTOPILOT_ATHR_SEQ2</EMISSIVE_NODE_ID>
-                <TOOLTIPID>%((A:AUTOPILOT THROTTLE ARM,Bool))%{if}TT:COCKPIT.TOOLTIPS.AUTOPILOT_PANEL_AUTOTHROTTLE_ARMED%{else}TT:COCKPIT.TOOLTIPS.AUTOPILOT_PANEL_AUTOTHROTTLE_OFF%{end}</TOOLTIPID>
+                <TOOLTIPID>%((L:A32NX_AUTOTHROTTLE_ARMED,Bool))%{if}TT:COCKPIT.TOOLTIPS.AUTOPILOT_PANEL_AUTOTHROTTLE_ARMED%{else}TT:COCKPIT.TOOLTIPS.AUTOPILOT_PANEL_AUTOTHROTTLE_OFF%{end}</TOOLTIPID>
+                <LEFT_SINGLE_CODE>
+                    1 (>K:AUTO_THROTTLE_ARM)
+                </LEFT_SINGLE_CODE>
             </UseTemplate>
 
             <UseTemplate Name="FBW_Airbus_Autopilot_Push_Localiser">

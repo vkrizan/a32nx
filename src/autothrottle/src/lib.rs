@@ -118,7 +118,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
     let thr2decs_id = sim.map_client_event_to_sim_event("THROTTLE2_DECR_SMALL", true)?;
 
     let athrpb_id = sim.map_client_event_to_sim_event("AUTO_THROTTLE_ARM", true)?;
-    let inst_id = sim.map_client_event_to_sim_event("A32NX.EVENT.ATHR_INSTINCTIVE_DISCONNECT", true)?;
+    let inst_id =
+        sim.map_client_event_to_sim_event("A32NX.EVENT.ATHR_INSTINCTIVE_DISCONNECT", true)?;
 
     sim.request_data_on_sim_object::<Flight>(0, SIMCONNECT_OBJECT_ID_USER, Period::SimFrame)?;
 
@@ -243,8 +244,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
 
             #[cfg(debug_assertions)]
             println!(
-                "ATHR: mode={:?}, engaged={}, active={}, {:?}",
-                output.mode, output.engaged, output.active, odata
+                "ATHR: mode={:?}, armed={}, active={}, {:?}",
+                output.mode, output.armed, output.active, odata
             );
 
             sim.set_data_on_sim_object(SIMCONNECT_OBJECT_ID_USER, &odata)?;

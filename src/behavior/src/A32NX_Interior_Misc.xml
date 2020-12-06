@@ -531,7 +531,7 @@
             <!-- TODO: sounds -->
             <MouseRect>
                 <Cursor>Hand</Cursor>
-                <TooltipID>#TOOLTIP_ID#</TooltipID>
+                <TooltipID>#TOOLTIPID#</TooltipID>
                 <MouseFlags>LeftSingle+LeftDrag Wheel</MouseFlags>
                 <CallbackDragging>
                     <Units>percent</Units>

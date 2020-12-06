@@ -21,7 +21,7 @@ pub enum Mode {
 #[derive(Debug)]
 pub struct AutoThrottleOutput {
     pub mode: Mode,
-    pub engaged: bool,
+    pub armed: bool,
     pub active: bool,
     pub commanded: f64,
 }
@@ -73,7 +73,7 @@ impl AutoThrottle {
             },
             output: AutoThrottleOutput {
                 mode: Mode::ThrustDescent,
-                engaged: false,
+                armed: false,
                 active: false,
                 commanded: 0.0,
             },
@@ -142,8 +142,8 @@ impl AutoThrottle {
         let r = !athr_common_or_specific
             // if the A/THR function on the opposite FMGC is disengaged and on condition that this FMGC has priority.
             || false
-            // Action on the A/THR pushbutton switch, with the A/THR function already engaged.
-            || (self.input.pushbutton && self.output.engaged)
+            // Action on the A/THR pushbutton switch, with the A/THR function already armed.
+            || (self.input.pushbutton && self.output.armed)
             // Action on one of the A/THR instinctive disconnect pushbuton switches.
             || self.input.instinctive_disconnect
             // ECU/EEC autothrust control feedback i.e. the A/THR being active at level of the
@@ -161,17 +161,17 @@ impl AutoThrottle {
             || self.input.throttles.iter().all(|t| *t <= Gates::IDLE);
 
         // SR flip-flop
-        self.output.engaged = if s {
+        self.output.armed = if s {
             !r
         } else if r {
             false
         } else {
-            self.output.engaged
+            self.output.armed
         };
 
         // After engagement, A/THR is active if:
         // the Alpha floor protection is active whatever the position of the throttle control levers.
-        self.output.active = self.output.engaged
+        self.output.active = self.output.armed
             && (alpha_floor_cond || {
                 // The two throttle control levers are between IDLE and CL (CL included)
                 let mut all_between_idle_cl = true;
