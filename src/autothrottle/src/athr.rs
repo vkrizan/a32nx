@@ -130,6 +130,8 @@ impl AutoThrottle {
         // is in alpha floor zone
         let alpha_floor_cond = false;
 
+        let one_engine_cond = false;
+
         let athr_common_or_specific = ap_fd_athr_common_cond || athr_specific_cond;
         let s = athr_common_or_specific
             && (
@@ -156,7 +158,7 @@ impl AutoThrottle {
             || false
             // Go around condition i.e. one throttle control lever is placed in the non active
             // area (> MCT) below 100ft without engagement of the GO AROUND mode on the AP/FD.
-            // || (self.input.radio_height < 100.0 && self.input.throttles.iter().any(|t| *t > Gates::FLEX_MCT))
+            || (false && (self.input.radio_height < 100.0 && self.input.throttles.iter().any(|t| *t > Gates::FLEX_MCT)))
             // Both throttle control levers placed in the IDLE position.
             // Both throttle control levers placed in the REVERSE position.
             || self.input.throttles.iter().all(|t| *t <= Gates::IDLE);
@@ -171,30 +173,16 @@ impl AutoThrottle {
         };
 
         // After engagement, A/THR is active if:
-        // the Alpha floor protection is active whatever the position of the throttle control levers.
         self.output.active = self.output.armed
-            && (alpha_floor_cond || {
-                // The two throttle control levers are between IDLE and CL (CL included)
-                let mut all_between_idle_cl = true;
-
-                // one throttle control lever is between IDLE and CL (including CL), and the other is between
-                // IDLE and MCT (including MCT) with FLEX TO limit mode not selected
-                let mut one_between_idle_flex_mct = false;
-                let mut one_between_idle_cl = false;
-
-                for t in &self.input.throttles {
-                    if *t > Gates::IDLE && *t <= Gates::CL {
-                        one_between_idle_cl = true;
-                    } else {
-                        all_between_idle_cl = false;
-                    }
-                    if (*t > Gates::IDLE && *t <= Gates::CL) || *t == Gates::FLEX_MCT {
-                        one_between_idle_flex_mct = true;
-                    }
-                }
-
-                all_between_idle_cl || (one_between_idle_flex_mct && one_between_idle_cl)
-            });
+            && (
+                // the Alpha floor protection is active whatever the position of the throttle control levers.
+                alpha_floor_cond
+                // one throttle control lever is between IDLE and CL (including CL), and the other
+                // is between IDLE and MCT (including MCT) with FLEX TO limit mode not selected.
+                || (one_engine_cond && false)
+                // The two throttle control levers are between IDLE and CL (CL included).
+                || self.input.throttles.iter().all(|t| *t > Gates::IDLE && *t <= Gates::CL)
+            );
     }
 
     // RukusDM
