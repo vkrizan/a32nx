@@ -81,26 +81,6 @@ impl AutoThrottle {
     }
 
     pub fn update(&mut self) {
-        match self.instinctive {
-            Instinctive::Released => {
-                if self.input.instinctive_disconnect {
-                    self.instinctive = Instinctive::Pushed(std::time::Instant::now());
-                }
-            }
-            Instinctive::Pushed(t) => {
-                if self.input.instinctive_disconnect {
-                    if t.elapsed().as_secs_f64() >= 15.0 {
-                        self.instinctive = Instinctive::Lockout;
-                    }
-                } else {
-                    self.instinctive = Instinctive::Released;
-                }
-            }
-            Instinctive::Lockout => {
-                return;
-            }
-        }
-
         self.engage_logic();
 
         if self.output.active {
@@ -110,7 +90,7 @@ impl AutoThrottle {
         }
     }
 
-    // FIGURE 22-31-00-130000-A SHEET 1
+    // FIGURE 22-31-00-13000-A SHEET 1
     // A/THR Engage Logic
     fn engage_logic(&mut self) {
         // - two ADIRS must be valid
@@ -119,12 +99,33 @@ impl AutoThrottle {
         // - management portion healthy
         let ap_fd_athr_common_cond = true;
 
+        // TODO: self.input.throttles is iterated several times here,
+        //       we should probably
+
         // - the two ECUs/EECs must be healthy
         // - the FCU must be healthy
         // - no discrepancy between the N1/EPR target computed in the FMGC and the N1/EPR feedback from each ECU/EEC
         // - VLS, VMAX, etc. must be healthy
         // - instinctive disconnect not held for 15s
-        let athr_specific_cond = true;
+        let athr_specific_cond = match self.instinctive {
+            Instinctive::Released => {
+                if self.input.instinctive_disconnect {
+                    self.instinctive = Instinctive::Pushed(std::time::Instant::now());
+                }
+                true
+            }
+            Instinctive::Pushed(t) => {
+                if self.input.instinctive_disconnect {
+                    if t.elapsed().as_secs_f64() >= 15.0 {
+                        self.instinctive = Instinctive::Lockout;
+                    }
+                } else {
+                    self.instinctive = Instinctive::Released;
+                }
+                true
+            }
+            Instinctive::Lockout => false,
+        };
 
         // is in alpha floor zone
         let alpha_floor_cond = false;
@@ -134,8 +135,8 @@ impl AutoThrottle {
             && (
                 // Action on A/THR pushbutton switch
                 self.input.pushbutton
-                // >MCT ?? idk
-                || false
+                // TOGA condition
+                || self.input.throttles.iter().all(|t| *t == Gates::FLEX_MCT || *t == Gates::TOGA)
                 || alpha_floor_cond
             );
 
@@ -155,7 +156,7 @@ impl AutoThrottle {
             || false
             // Go around condition i.e. one throttle control lever is placed in the non active
             // area (> MCT) below 100ft without engagement of the GO AROUND mode on the AP/FD.
-            || (self.input.radio_height < 100.0 && self.input.throttles.iter().any(|t| *t > Gates::FLEX_MCT))
+            // || (self.input.radio_height < 100.0 && self.input.throttles.iter().any(|t| *t > Gates::FLEX_MCT))
             // Both throttle control levers placed in the IDLE position.
             // Both throttle control levers placed in the REVERSE position.
             || self.input.throttles.iter().all(|t| *t <= Gates::IDLE);
@@ -187,7 +188,7 @@ impl AutoThrottle {
                     } else {
                         all_between_idle_cl = false;
                     }
-                    if *t > Gates::IDLE && *t <= Gates::FLEX_MCT {
+                    if (*t > Gates::IDLE && *t <= Gates::CL) || *t == Gates::FLEX_MCT {
                         one_between_idle_flex_mct = true;
                     }
                 }
