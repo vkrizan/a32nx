@@ -508,15 +508,19 @@
             <PART_ID>ENGINE_Lever_Throttle</PART_ID>
         </DefaultTemplateParameters>
         <Component ID="#NODE_ID#" Node="#NODE_ID#">
+            <Update>
+                (A:GENERAL ENG THROTTLE LEVER POSITION #ID#) (&gt;L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#)
+            </Update>
+
             <!-- REVERSER -->
             <UseTemplate Name="ASOBO_GT_Anim_Code">
                 <ANIM_CODE>
-                    (L:A32NX_THROTTLE_LEVER_REVERSER_#ID#)
+                    (L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#) 0 &lt; 100 *
                 </ANIM_CODE>
 				<ANIM_NAME>#ANIM_NAME_REVERSE_LOCK#</ANIM_NAME>
 			</UseTemplate>
 			<UseTemplate Name="ASOBO_GT_AnimTriggers_2SoundEvents">
-				<ANIM_NAME>#ANIM_NAME_REVERSE_LOCK#</ANIM_NAME>
+				<ANIM_NAME>THROTTLE_LEVER_#ID#_LOCK</ANIM_NAME>
 				<WWISE_EVENT_1>throttle_lever_lock_on</WWISE_EVENT_1>
 				<WWISE_EVENT_2>throttle_lever_lock_off</WWISE_EVENT_2>
 			</UseTemplate>
@@ -524,19 +528,19 @@
             <!-- MAIN LEVER -->
             <UseTemplate Name="ASOBO_GT_Anim_Code">
                 <ANIM_CODE>
-                    (L:A32NX_THROTTLE_LEVER_POSITION_#ID#)
+                    (L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#)
                 </ANIM_CODE>
                 <ANIM_NAME>#ANIM_NAME#</ANIM_NAME>
             </UseTemplate>
             <!-- TODO: sounds -->
             <MouseRect>
                 <Cursor>Hand</Cursor>
-                <TooltipID>#TOOLTIPID#</TooltipID>
+                <TooltipID>TT:COCKPIT.TOOLTIPS.ENG#ID#_THROTTLE_CONTROL</TooltipID>
                 <MouseFlags>LeftSingle+LeftDrag Wheel</MouseFlags>
                 <CallbackDragging>
                     <Units>percent</Units>
                     <MaxValue>16384</MaxValue>
-                    <MinValue>-3277</MinValue>
+                    <MinValue>-16384</MinValue>
                     <Variable>L:A32NX_THROTTLE_LEVER_POSITION_#ID#</Variable>
                     <EventID>THROTTLE#ID#_SET</EventID>
                 </CallbackDragging>

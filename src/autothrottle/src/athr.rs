@@ -28,10 +28,11 @@ pub struct AutoThrottleOutput {
 
 pub struct Gates {}
 impl Gates {
-    pub const IDLE: f64 = 0.0;
-    pub const CL: f64 = 89.0;
-    pub const FLEX_MCT: f64 = 95.0;
     pub const TOGA: f64 = 100.0;
+    pub const FLEX_MCT: f64 = 95.0;
+    pub const CL: f64 = 89.0;
+    pub const IDLE: f64 = 0.0;
+    pub const REV_IDLE: f64 = -7.0;
 }
 
 #[derive(Debug, PartialEq)]

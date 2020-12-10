@@ -40,30 +40,8 @@ struct Output {
     t2: f64,
 }
 
-fn map(n: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
+fn mapf(n: f64, in_min: f64, in_max: f64, out_min: f64, out_max: f64) -> f64 {
     (n - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
-}
-
-const MAX_THROTTLE: f64 = 100.0;
-const MIN_THROTTLE: f64 = -20.0;
-
-fn map_virtual(n: std::os::raw::c_ulong) -> f64 {
-    let n = n as std::os::raw::c_long as f64;
-    if n > 0.0 {
-        map(n, 0.0, 16384.0, 0.0, MAX_THROTTLE)
-    } else {
-        map(n, -3277.0, 0.0, MIN_THROTTLE, 0.0)
-    }
-}
-
-fn map_real(n: std::os::raw::c_ulong, reverse_toggle: bool, reverse_hold: bool) -> f64 {
-    const MAX: f64 = 16384.0;
-    let n = n as std::os::raw::c_long as f64;
-    if reverse_toggle || reverse_hold {
-        map(n, -MAX, MAX, 0.0, MIN_THROTTLE)
-    } else {
-        map(n, -MAX, MAX, 0.0, MAX_THROTTLE)
-    }
 }
 
 const INC_DELTA: f64 = 2.5;
@@ -91,16 +69,20 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
     let mut sim = module.open_simconnect("ATHR")?;
     let mut athr = athr::AutoThrottle::new();
 
+    let revtog_id = sim.map_client_event_to_sim_event("THROTTLE_REVERSE_THRUST_TOGGLE", true)?;
+    let revhold_id = sim.map_client_event_to_sim_event("THROTTLE_REVERSE_THRUST_HOLD", true)?;
+
     let tset_id = sim.map_client_event_to_sim_event("THROTTLE_SET", true)?;
     let t1set_id = sim.map_client_event_to_sim_event("THROTTLE1_SET", true)?;
     let t2set_id = sim.map_client_event_to_sim_event("THROTTLE2_SET", true)?;
 
+    let atset_id = sim.map_client_event_to_sim_event("AXIS_THROTTLE_SET", true)?;
+    let at1set_id = sim.map_client_event_to_sim_event("AXIS_THROTTLE1_SET", true)?;
+    let at2set_id = sim.map_client_event_to_sim_event("AXIS_THROTTLE2_SET", true)?;
+
     let exset_id = sim.map_client_event_to_sim_event("THROTTLE_AXIS_SET_EX1", true)?;
     let ex1set_id = sim.map_client_event_to_sim_event("THROTTLE1_AXIS_SET_EX1", true)?;
     let ex2set_id = sim.map_client_event_to_sim_event("THROTTLE2_AXIS_SET_EX1", true)?;
-
-    let revtog_id = sim.map_client_event_to_sim_event("THROTTLE_REVERSE_THRUST_TOGGLE", true)?;
-    let revhold_id = sim.map_client_event_to_sim_event("THROTTLE_REVERSE_THRUST_HOLD", true)?;
 
     let thrinc_id = sim.map_client_event_to_sim_event("THROTTLE_INCR", true)?;
     let thrdec_id = sim.map_client_event_to_sim_event("THROTTLE_DECR", true)?;
@@ -118,8 +100,7 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
     let thr2decs_id = sim.map_client_event_to_sim_event("THROTTLE2_DECR_SMALL", true)?;
 
     let athrpb_id = sim.map_client_event_to_sim_event("AUTO_THROTTLE_ARM", true)?;
-    let inst_id =
-        sim.map_client_event_to_sim_event("A32NX.EVENT.ATHR_INSTINCTIVE_DISCONNECT", true)?;
+    let inst_id = sim.map_client_event_to_sim_event("A32NX.ATHR_INSTINCTIVE_DISCONNECT", true)?;
 
     sim.request_data_on_sim_object::<Flight>(0, SIMCONNECT_OBJECT_ID_USER, Period::SimFrame)?;
 
@@ -128,38 +109,53 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
     let mut t1 = 0.0;
     let mut t2 = 0.0;
 
+    macro_rules! calc {
+        ($v:expr) => {
+            $v as std::os::raw::c_long as f64
+        };
+    }
+
     while let Some(recv) = module.next_event().await {
         match recv {
             SimConnectRecv::Event(event) => match event.id() {
-                x if x == tset_id => {
-                    let data = map_virtual(event.data());
-                    t1 = data;
-                    t2 = data;
-                }
-                // FIXME: virtual cockpit throttle levers need to be supported.
-                //        this involves changes to the XML.
-                x if x == t1set_id => {
-                    // t1 = map_virtual(event.data());
-                }
-                x if x == t2set_id => {
-                    // t2 = map_virtual(event.data());
-                }
-                x if x == exset_id => {
-                    let data = map_real(event.data(), reverse_toggle, reverse_hold);
-                    t1 = data;
-                    t2 = data;
-                }
-                x if x == ex1set_id => {
-                    t1 = map_real(event.data(), reverse_toggle, reverse_hold);
-                }
-                x if x == ex2set_id => {
-                    t2 = map_real(event.data(), reverse_toggle, reverse_hold);
-                }
                 x if x == revtog_id => {
                     reverse_toggle = !reverse_toggle;
                 }
                 x if x == revhold_id => {
                     reverse_hold = event.data() == 1;
+                }
+                x if x == tset_id => {
+                    let data = calc!(event.data());
+                    t1 = data;
+                    t2 = data;
+                }
+                x if x == t1set_id => {
+                    t1 = calc!(event.data());
+                }
+                x if x == t2set_id => {
+                    t2 = calc!(event.data());
+                }
+                x if x == atset_id => {
+                    let data = calc!(event.data());
+                    t1 = data;
+                    t2 = data;
+                }
+                x if x == at1set_id => {
+                    t1 = calc!(event.data());
+                }
+                x if x == at2set_id => {
+                    t2 = calc!(event.data());
+                }
+                x if x == exset_id => {
+                    let data = calc!(event.data());
+                    t1 = data;
+                    t2 = data;
+                }
+                x if x == ex1set_id => {
+                    t1 = calc!(event.data());
+                }
+                x if x == ex2set_id => {
+                    t2 = calc!(event.data());
                 }
                 x if x == thrinc_id => {
                     inc(&mut t1, INC_DELTA);
@@ -209,26 +205,28 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
             _ => {}
         }
 
-        // FIXME: missing ATHR momentary and instinctive disconnect inputs
-
-        {
-            let mut input = athr.input();
-
-            let map = |t| {
-                for (low, high, target) in &[
-                    (86.6, 90.0, athr::Gates::CL),
-                    (94.0, 96.0, athr::Gates::FLEX_MCT),
-                    (99.5, 100.0, athr::Gates::TOGA),
-                ] {
-                    if t >= *low && t <= *high {
-                        return *target;
-                    }
-                }
-                t
+        let map = |t| {
+            let t = if reverse_hold || reverse_toggle {
+                mapf(t, -16384.0, 16384.0, athr::Gates::REV_IDLE, -20.0)
+            } else {
+                mapf(t, -16384.0, 16384.0, 0.0, 100.0)
             };
+            for (low, high, target) in &[
+                (86.6, 90.0, athr::Gates::CL),
+                (94.0, 96.0, athr::Gates::FLEX_MCT),
+                (99.5, 100.0, athr::Gates::TOGA),
+            ] {
+                if t >= *low && t <= *high {
+                    return *target;
+                }
+            }
+            t
+        };
 
-            input.throttles = [map(t1), map(t2)];
-        }
+        let t1 = map(t1);
+        let t2 = map(t2);
+
+        athr.input().throttles = [t1, t2];
 
         athr.update();
 
@@ -247,6 +245,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
                 "ATHR: mode={:?}, armed={}, active={}, {:?}",
                 output.mode, output.armed, output.active, odata
             );
+
+            // FIXME: need to set L:A32NX_3D_THROTTLE_LEVER_POSITION_{n}
 
             sim.set_data_on_sim_object(SIMCONNECT_OBJECT_ID_USER, &odata)?;
         }
