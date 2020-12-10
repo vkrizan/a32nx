@@ -508,19 +508,25 @@
             <PART_ID>ENGINE_Lever_Throttle</PART_ID>
         </DefaultTemplateParameters>
         <Component ID="#NODE_ID#" Node="#NODE_ID#">
+            <!-- temporary code for testing -->
             <Update>
-                (A:GENERAL ENG THROTTLE LEVER POSITION #ID#) (&gt;L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#)
+                (A:GENERAL ENG THROTTLE LEVER POSITION:#ID#,percent) sp0
+                l0 0 >= if{
+                    l0 0 - 100 25 - * 100 0 - / 25 +
+                } els{
+                    l0 -20 - 25 0 - * 0 -20 - / 0 +
+                } (>L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#,percent)
             </Update>
 
             <!-- REVERSER -->
             <UseTemplate Name="ASOBO_GT_Anim_Code">
                 <ANIM_CODE>
-                    (L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#) 0 &lt; 100 *
+                    (L:A32NX_3D_THROTTLE_LEVER_POSITION_#ID#) 25 &lt; 100 *
                 </ANIM_CODE>
-				<ANIM_NAME>#ANIM_NAME_REVERSE_LOCK#</ANIM_NAME>
+				<ANIM_NAME>LEVER_THROTTLE_#ID#_LOCK</ANIM_NAME>
 			</UseTemplate>
 			<UseTemplate Name="ASOBO_GT_AnimTriggers_2SoundEvents">
-				<ANIM_NAME>THROTTLE_LEVER_#ID#_LOCK</ANIM_NAME>
+				<ANIM_NAME>LEVER_THROTTLE_#ID#_LOCK</ANIM_NAME>
 				<WWISE_EVENT_1>throttle_lever_lock_on</WWISE_EVENT_1>
 				<WWISE_EVENT_2>throttle_lever_lock_off</WWISE_EVENT_2>
 			</UseTemplate>
@@ -538,10 +544,10 @@
                 <TooltipID>TT:COCKPIT.TOOLTIPS.ENG#ID#_THROTTLE_CONTROL</TooltipID>
                 <MouseFlags>LeftSingle+LeftDrag Wheel</MouseFlags>
                 <CallbackDragging>
-                    <Units>percent</Units>
                     <MaxValue>16384</MaxValue>
                     <MinValue>-16384</MinValue>
-                    <Variable>L:A32NX_THROTTLE_LEVER_POSITION_#ID#</Variable>
+                    <Variable>PROP RPM:#ID#</Variable> <!-- dump into unused aircraft var -->
+                    <Units>percent</Units>
                     <EventID>THROTTLE#ID#_SET</EventID>
                 </CallbackDragging>
             </MouseRect>

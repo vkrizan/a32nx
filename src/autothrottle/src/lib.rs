@@ -211,12 +211,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
             } else {
                 mapf(t, -16384.0, 16384.0, 0.0, 100.0)
             };
-            for (low, high, target) in &[
-                (86.6, 90.0, athr::Gates::CL),
-                (94.0, 96.0, athr::Gates::FLEX_MCT),
-                (99.5, 100.0, athr::Gates::TOGA),
-            ] {
-                if t >= *low && t <= *high {
+            for target in &[athr::Gates::TOGA, athr::Gates::FLEX_MCT, athr::Gates::CL] {
+                if t > *target - athr::Gates::GATE_SIZE && t < *target + Athr::Gates::GATE_SIZE {
                     return *target;
                 }
             }
