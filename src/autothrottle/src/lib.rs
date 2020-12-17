@@ -1,5 +1,5 @@
 use ::msfs::{
-    msfs,
+    self,
     sim_connect::{data_definition, Period, SimConnectRecv, SIMCONNECT_OBJECT_ID_USER},
 };
 mod athr;
@@ -212,7 +212,7 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
                 mapf(t, -16384.0, 16384.0, 0.0, 100.0)
             };
             for target in &[athr::Gates::TOGA, athr::Gates::FLEX_MCT, athr::Gates::CL] {
-                if t > *target - athr::Gates::GATE_SIZE && t < *target + Athr::Gates::GATE_SIZE {
+                if t > *target - athr::Gates::GATE_SIZE && t < *target + athr::Gates::GATE_SIZE {
                     return *target;
                 }
             }

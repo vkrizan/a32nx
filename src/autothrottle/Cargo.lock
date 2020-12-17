@@ -67,6 +67,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "cc"
+version = "1.0.66"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c0496836a84f8d0495758516b8621a622beb77c0fed418570e50764093ced48"
+
+[[package]]
 name = "cexpr"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -259,15 +265,15 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.80"
+version = "0.2.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d58d1b70b004888f764dfbf6a26a3b0342a1632d33968e4a179d8011c760614"
+checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
 
 [[package]]
 name = "libloading"
-version = "0.6.5"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1090080fe06ec2648d0da3881d9453d97e71a45f00eb179af7fdd7e3f686fdb0"
+checksum = "e9367bdfa836b7e3cf895867f7a570283444da90562980ec2263d6e1569b16bc"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi",
@@ -290,10 +296,11 @@ checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 
 [[package]]
 name = "msfs"
-version = "0.0.0-pre.1"
-source = "git+https://github.com/devsnek/msfs-rs.git?branch=main#1a4eee19512021f97e441bc70cd2fef0f8a9a8e8"
+version = "0.0.1-alpha.0"
+source = "git+https://github.com/devsnek/msfs-rs.git?branch=main#b616d5955a80cfa2f476b7fe9563a5ed44cd236f"
 dependencies = [
  "bindgen",
+ "cc",
  "futures",
  "msfs_derive",
  "msfs_sdk",
@@ -301,8 +308,8 @@ dependencies = [
 
 [[package]]
 name = "msfs_derive"
-version = "0.1.0"
-source = "git+https://github.com/devsnek/msfs-rs.git?branch=main#1a4eee19512021f97e441bc70cd2fef0f8a9a8e8"
+version = "0.0.1-alpha.0"
+source = "git+https://github.com/devsnek/msfs-rs.git?branch=main#b616d5955a80cfa2f476b7fe9563a5ed44cd236f"
 dependencies = [
  "msfs_sdk",
  "quote",
@@ -311,8 +318,8 @@ dependencies = [
 
 [[package]]
 name = "msfs_sdk"
-version = "0.1.0"
-source = "git+https://github.com/devsnek/msfs-rs.git?branch=main#1a4eee19512021f97e441bc70cd2fef0f8a9a8e8"
+version = "0.0.1-alpha.0"
+source = "git+https://github.com/devsnek/msfs-rs.git?branch=main#b616d5955a80cfa2f476b7fe9563a5ed44cd236f"
 
 [[package]]
 name = "nom"
@@ -442,9 +449,9 @@ checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
 
 [[package]]
 name = "syn"
-version = "1.0.52"
+version = "1.0.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c1e438504729046a5cfae47f97c30d6d083c7d91d94603efdae3477fc070d4c"
+checksum = "9a2af957a63d6bd42255c359c93d9bfdb97076bd3b820897ce55ffbfbf107f44"
 dependencies = [
  "proc-macro2",
  "quote",
