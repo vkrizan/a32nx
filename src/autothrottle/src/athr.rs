@@ -1,10 +1,11 @@
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Mode {
+    Init,
     Speed,
     ThrustClimb,
     ThrustDescent,
     AlphaFloor,
-    TOGALock,
+    ThrustLock,
 }
 
 #[derive(Debug)]
@@ -48,7 +49,7 @@ impl Gates {
 #[derive(Debug, PartialEq)]
 enum Instinctive {
     Released,
-    Pushed(std::time::Instant),
+    Pushed(f64),
     Lockout,
 }
 
@@ -56,9 +57,8 @@ enum Instinctive {
 pub struct AutoThrottle {
     speed_mode_pid: crate::pid::PID,
     thrust_rate_limiter: crate::rl::RateLimiter,
-    last_t: std::time::Instant,
     instinctive: Instinctive,
-    toga_lock_throttles: [f64; 2],
+    thrust_lock_throttles: [f64; 2],
     commanded: f64,
     input: AutoThrottleInput,
     output: AutoThrottleOutput,
@@ -69,12 +69,11 @@ impl AutoThrottle {
         AutoThrottle {
             speed_mode_pid: crate::pid::PID::new(10.0, 1.0, 0.3, 10.0, 0.0, 100.0),
             thrust_rate_limiter: crate::rl::RateLimiter::new(),
-            last_t: std::time::Instant::now(),
             instinctive: Instinctive::Released,
-            toga_lock_throttles: [0.0, 0.0],
+            thrust_lock_throttles: [0.0, 0.0],
             commanded: 0.0,
             input: AutoThrottleInput {
-                mode: Mode::Speed,
+                mode: Mode::Init,
                 throttles: [0.0, 0.0],
                 airspeed: 0.0,
                 airspeed_target: 0.0,
@@ -85,7 +84,7 @@ impl AutoThrottle {
                 instinctive_disconnect: false,
             },
             output: AutoThrottleOutput {
-                mode: Mode::Speed,
+                mode: Mode::Init,
                 armed: false,
                 active: false,
                 commanded: [0.0, 0.0],
@@ -93,25 +92,27 @@ impl AutoThrottle {
         }
     }
 
-    pub fn update(&mut self) {
-        self.engage_logic();
+    pub fn update(&mut self, dt: std::time::Duration) {
+        self.engage_logic(dt);
 
         if self.output.active {
-            self.active_logic();
+            self.active_logic(dt);
+
+            let m = |i: usize| match self.output.mode {
+                Mode::AlphaFloor | Mode::ThrustLock => self.commanded,
+                _ => self.input.throttles[i].min(self.commanded),
+            };
+
+            self.output.commanded = [m(0), m(1)];
         } else {
             self.commanded = 100.0;
+            self.output.commanded = [self.input.throttles[0], self.input.throttles[1]];
         }
-
-        let m = |i: usize| match self.output.mode {
-            Mode::AlphaFloor | Mode::TOGALock => self.commanded,
-            _ => self.input.throttles[i].min(self.commanded),
-        };
-        self.output.commanded = [m(0), m(1)];
     }
 
     // FIGURE 22-31-00-13000-A SHEET 1
     // A/THR Engage Logic
-    fn engage_logic(&mut self) {
+    fn engage_logic(&mut self, dt: std::time::Duration) {
         // - two ADIRS must be valid
         // - one LGCIU must be healthy
         // - guidance portion healthy
@@ -126,19 +127,24 @@ impl AutoThrottle {
         let athr_specific_cond = match self.instinctive {
             Instinctive::Released => {
                 if self.input.instinctive_disconnect {
-                    self.instinctive = Instinctive::Pushed(std::time::Instant::now());
+                    self.instinctive = Instinctive::Pushed(0.0);
                 }
                 true
             }
             Instinctive::Pushed(t) => {
                 if self.input.instinctive_disconnect {
-                    if t.elapsed().as_secs_f64() >= 15.0 {
+                    let nt = t + dt.as_secs_f64();
+                    if nt >= 15.0 {
                         self.instinctive = Instinctive::Lockout;
+                        false
+                    } else {
+                        self.instinctive = Instinctive::Pushed(nt);
+                        true
                     }
                 } else {
                     self.instinctive = Instinctive::Released;
+                    true
                 }
-                true
             }
             Instinctive::Lockout => false,
         };
@@ -174,7 +180,10 @@ impl AutoThrottle {
             || (false && (self.input.radio_height < 100.0 && self.input.throttles.iter().any(|t| *t > Gates::FLEX_MCT)))
             // Both throttle control levers placed in the IDLE position.
             // Both throttle control levers placed in the REVERSE position.
-            || self.input.throttles.iter().all(|t| *t <= Gates::IDLE);
+            || match self.output.mode {
+                Mode::AlphaFloor | Mode::ThrustLock => false,
+                _ => !self.input.alpha_floor && self.input.throttles.iter().all(|t| *t <= Gates::IDLE),
+            };
 
         // SR flip-flop
         self.output.armed = if s {
@@ -189,51 +198,57 @@ impl AutoThrottle {
         self.output.active = self.output.armed
             && (
                 // the Alpha floor protection is active whatever the position of the throttle control levers.
-                self.input.alpha_floor
+                (self.input.alpha_floor || self.output.mode == Mode::AlphaFloor || self.output.mode == Mode::ThrustLock)
                 // one throttle control lever is between IDLE and CL (including CL), and the other
                 // is between IDLE and MCT (including MCT) with FLEX TO limit mode not selected.
                 || (one_engine_cond && false)
                 // The two throttle control levers are between IDLE and CL (CL included).
                 || self.input.throttles.iter().all(|t| *t > Gates::IDLE && *t <= Gates::CL)
             );
-
-        if self.output.active {
-            self.output.mode = if self.input.alpha_floor {
-                Mode::AlphaFloor
-            } else {
-                match self.output.mode {
-                    Mode::AlphaFloor => {
-                        self.toga_lock_throttles = self.input.throttles;
-                        Mode::TOGALock
-                    }
-                    Mode::TOGALock => {
-                        if self.toga_lock_throttles == self.input.throttles {
-                            Mode::TOGALock
-                        } else {
-                            self.input.mode
-                        }
-                    }
-                    _ => self.input.mode,
-                }
-            };
-
-            if self.input.mode != self.output.mode && self.output.mode == Mode::Speed {
-                self.speed_mode_pid.reset(
-                    self.input.target_airspeed(),
-                    self.input.airspeed,
-                    self.last_t.elapsed().as_secs_f64(),
-                    self.commanded,
-                );
-                self.thrust_rate_limiter.reset(self.commanded);
-            }
-        }
     }
 
-    fn active_logic(&mut self) {
-        let dt = self.last_t.elapsed().as_secs_f64();
-        self.last_t = std::time::Instant::now();
+    fn active_logic(&mut self, dt: std::time::Duration) {
+        let dt = dt.as_secs_f64();
+
+        self.output.mode = if self.input.alpha_floor {
+            Mode::AlphaFloor
+        } else {
+            let new_mode = match self.output.mode {
+                Mode::Init => Mode::Speed,
+                Mode::AlphaFloor => Mode::ThrustLock,
+                Mode::ThrustLock => {
+                    if self.thrust_lock_throttles == self.input.throttles {
+                        Mode::ThrustLock
+                    } else {
+                        self.input.mode
+                    }
+                }
+                _ => self.input.mode,
+            };
+
+            if new_mode != self.output.mode {
+                match new_mode {
+                    Mode::Speed => {
+                        self.speed_mode_pid.reset(
+                            self.input.target_airspeed(),
+                            self.input.airspeed,
+                            dt,
+                            self.commanded,
+                        );
+                        self.thrust_rate_limiter.reset(self.commanded);
+                    }
+                    Mode::ThrustLock => {
+                        self.thrust_lock_throttles = self.input.throttles;
+                    }
+                    _ => {}
+                }
+            }
+
+            new_mode
+        };
 
         self.commanded = match self.output.mode {
+            Mode::Init => unreachable!(),
             Mode::Speed => self.thrust_rate_limiter.iterate(
                 self.speed_mode_pid
                     .update(self.input.target_airspeed(), self.input.airspeed, dt),
@@ -251,7 +266,8 @@ impl AutoThrottle {
                 4.0,
                 dt,
             ),
-            Mode::AlphaFloor | Mode::TOGALock => 100.0,
+            Mode::AlphaFloor => 100.0,
+            Mode::ThrustLock => self.commanded,
         }
     }
 

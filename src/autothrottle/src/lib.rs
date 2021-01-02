@@ -111,6 +111,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
     let mut t1 = 0.0;
     let mut t2 = 0.0;
 
+    let mut last_t = std::time::Instant::now();
+
     macro_rules! calc {
         ($v:expr) => {
             $v as std::os::raw::c_long as f64
@@ -199,8 +201,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
                     let input = athr.input();
                     input.airspeed = data.airspeed;
                     input.airspeed_target = data.airspeed_hold;
-                    // input.vls = ?;
-                    // input.alpha_floor = ?;
+                    // input.vls = (L:A32NX_SPEEDS_VLS, knots);
+                    // input.alpha_floor = ??;
                     input.radio_height = data.radio_height;
 
                     if data.autopilot && last_altitude_lock != data.altitude_lock {
@@ -236,7 +238,10 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
 
         athr.input().throttles = [map(t1), map(t2)];
 
-        athr.update();
+        let dt = last_t.elapsed();
+        last_t = std::time::Instant::now();
+
+        athr.update(dt);
 
         // clear momentary input
         athr.input().pushbutton = false;
