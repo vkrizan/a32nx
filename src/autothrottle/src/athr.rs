@@ -118,9 +118,6 @@ impl AutoThrottle {
         // - management portion healthy
         let ap_fd_athr_common_cond = true;
 
-        // TODO: self.input.throttles is iterated several times here,
-        //       we should probably
-
         // - the two ECUs/EECs must be healthy
         // - the FCU must be healthy
         // - no discrepancy between the N1/EPR target computed in the FMGC and the N1/EPR feedback from each ECU/EEC
@@ -146,7 +143,9 @@ impl AutoThrottle {
             Instinctive::Lockout => false,
         };
 
-        // is in alpha floor zone
+        // is in alpha floor zone, should theoretically only be reachable
+        // with aft sidestick, but this may require some communication
+        // with fbw system to prevent accidentaly activation.
         let alpha_floor_cond = self.input.airspeed < self.input.alpha_prot;
 
         let one_engine_cond = false;
