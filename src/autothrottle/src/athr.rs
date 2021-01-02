@@ -1,21 +1,21 @@
-#[derive(Debug)]
-pub struct AutoThrottleInput {
-    pub throttles: [f64; 2],
-    pub airspeed: f64,
-    pub altitude: f64,
-    pub airspeed_hold: f64,
-    pub altitude_lock: f64,
-    pub radio_height: f64,
-    pub autopilot: bool,
-    pub pushbutton: bool,
-    pub instinctive_disconnect: bool,
-}
-
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Mode {
     Speed,
     ThrustClimb,
     ThrustDescent,
+    AlphaFloor,
+    TOGALock,
+}
+
+#[derive(Debug)]
+pub struct AutoThrottleInput {
+    pub mode: Mode,
+    pub throttles: [f64; 2],
+    pub airspeed: f64,
+    pub airspeed_target: f64,
+    pub radio_height: f64,
+    pub pushbutton: bool,
+    pub instinctive_disconnect: bool,
 }
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ pub struct AutoThrottleOutput {
     pub mode: Mode,
     pub armed: bool,
     pub active: bool,
-    pub commanded: f64,
+    pub commanded: [f64; 2],
 }
 
 pub struct Gates {}
@@ -48,9 +48,10 @@ enum Instinctive {
 pub struct AutoThrottle {
     speed_mode_pid: crate::pid::PID,
     thrust_rate_limiter: crate::rl::RateLimiter,
-    last_altitude_lock: f64,
     last_t: std::time::Instant,
     instinctive: Instinctive,
+    toga_lock_throttles: [f64; 2],
+    commanded: f64,
     input: AutoThrottleInput,
     output: AutoThrottleOutput,
 }
@@ -60,25 +61,24 @@ impl AutoThrottle {
         AutoThrottle {
             speed_mode_pid: crate::pid::PID::new(10.0, 1.0, 0.3, 10.0, 0.0, 100.0),
             thrust_rate_limiter: crate::rl::RateLimiter::new(),
-            last_altitude_lock: 0.0,
             last_t: std::time::Instant::now(),
             instinctive: Instinctive::Released,
+            toga_lock_throttles: [0.0, 0.0],
+            commanded: 0.0,
             input: AutoThrottleInput {
+                mode: Mode::Speed,
                 throttles: [0.0, 0.0],
                 airspeed: 0.0,
-                altitude: 0.0,
-                airspeed_hold: 0.0,
-                altitude_lock: 0.0,
+                airspeed_target: 0.0,
                 radio_height: 0.0,
-                autopilot: false,
                 pushbutton: false,
                 instinctive_disconnect: false,
             },
             output: AutoThrottleOutput {
-                mode: Mode::ThrustDescent,
+                mode: Mode::Speed,
                 armed: false,
                 active: false,
-                commanded: 0.0,
+                commanded: [0.0, 0.0],
             },
         }
     }
@@ -89,8 +89,14 @@ impl AutoThrottle {
         if self.output.active {
             self.active_logic();
         } else {
-            self.output.commanded = 100.0;
+            self.commanded = 100.0;
         }
+
+        let m = |i: usize| match self.output.mode {
+            Mode::AlphaFloor | Mode::TOGALock => self.commanded,
+            _ => self.input.throttles[i].min(self.commanded),
+        };
+        self.output.commanded = [m(0), m(1)];
     }
 
     // FIGURE 22-31-00-13000-A SHEET 1
@@ -186,64 +192,62 @@ impl AutoThrottle {
                 // The two throttle control levers are between IDLE and CL (CL included).
                 || self.input.throttles.iter().all(|t| *t > Gates::IDLE && *t <= Gates::CL)
             );
+
+        if self.output.active {
+            self.output.mode = if alpha_floor_cond {
+                Mode::AlphaFloor
+            } else {
+                match self.output.mode {
+                    Mode::AlphaFloor => {
+                        self.toga_lock_throttles = self.input.throttles;
+                        Mode::TOGALock
+                    }
+                    Mode::TOGALock => {
+                        if self.toga_lock_throttles == self.input.throttles {
+                            Mode::TOGALock
+                        } else {
+                            self.input.mode
+                        }
+                    }
+                    _ => self.input.mode,
+                }
+            };
+
+            if self.input.mode != self.output.mode && self.output.mode == Mode::Speed {
+                self.speed_mode_pid.reset(
+                    self.input.airspeed_target,
+                    self.input.airspeed,
+                    self.last_t.elapsed().as_secs_f64(),
+                    self.commanded,
+                );
+                self.thrust_rate_limiter.reset(self.commanded);
+            }
+        }
     }
 
-    // RukusDM
     fn active_logic(&mut self) {
         let dt = self.last_t.elapsed().as_secs_f64();
         self.last_t = std::time::Instant::now();
 
-        // detect pauses
-        #[allow(clippy::float_cmp)]
-        if dt == 0.0 {
-            return;
-        }
-
-        #[allow(clippy::float_cmp)]
-        if self.input.autopilot && self.last_altitude_lock != self.input.altitude_lock {
-            self.last_altitude_lock = self.input.altitude_lock;
-            if self.input.altitude_lock > self.input.altitude {
-                self.output.mode = Mode::ThrustClimb;
-            } else {
-                self.output.mode = Mode::ThrustDescent;
-            }
-        }
-
-        match self.output.mode {
-            Mode::Speed => {
-                self.output.commanded = self.thrust_rate_limiter.iterate(
-                    self.speed_mode_pid
-                        .update(self.input.airspeed_hold, self.input.airspeed, dt),
-                    10.0,
-                    10.0,
-                    dt,
-                );
-            }
-            Mode::ThrustClimb | Mode::ThrustDescent => {
-                self.output.commanded = self.thrust_rate_limiter.iterate(
-                    if self.output.mode == Mode::ThrustClimb {
-                        80.0
-                    } else {
-                        0.0
-                    },
-                    4.0,
-                    4.0,
-                    dt,
-                );
-
-                if !self.input.autopilot
-                    || (self.input.altitude_lock - self.input.altitude).abs() < 1000.0
-                {
-                    self.output.mode = Mode::Speed;
-                    self.speed_mode_pid.reset(
-                        self.input.airspeed_hold,
-                        self.input.airspeed,
-                        dt,
-                        self.output.commanded,
-                    );
-                    self.thrust_rate_limiter.reset(self.output.commanded);
-                }
-            }
+        self.commanded = match self.output.mode {
+            Mode::Speed => self.thrust_rate_limiter.iterate(
+                self.speed_mode_pid
+                    .update(self.input.airspeed_target, self.input.airspeed, dt),
+                10.0,
+                10.0,
+                dt,
+            ),
+            Mode::ThrustClimb | Mode::ThrustDescent => self.thrust_rate_limiter.iterate(
+                if self.output.mode == Mode::ThrustClimb {
+                    80.0
+                } else {
+                    0.0
+                },
+                4.0,
+                4.0,
+                dt,
+            ),
+            Mode::AlphaFloor | Mode::TOGALock => 100.0,
         }
     }
 

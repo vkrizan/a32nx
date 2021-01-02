@@ -1,3 +1,5 @@
+#![allow(clippy::float_cmp)]
+
 use ::msfs::{
     self,
     sim_connect::{data_definition, Period, SimConnectRecv, SIMCONNECT_OBJECT_ID_USER},
@@ -115,6 +117,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
         };
     }
 
+    let mut last_altitude_lock = 0.0;
+
     while let Some(recv) = module.next_event().await {
         match recv {
             SimConnectRecv::Event(event) => match event.id() {
@@ -180,7 +184,7 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
                 x if x == thr2inc_id => inc(&mut t2, INC_DELTA),
                 x if x == thr2dec_id => dec(&mut t2, INC_DELTA),
                 x if x == thr2incs_id => inc(&mut t2, INC_DELTA_SMALL),
-                x if x == thr2decs_id => inc(&mut t2, INC_DELTA_SMALL),
+                x if x == thr2decs_id => dec(&mut t2, INC_DELTA_SMALL),
                 x if x == athrpb_id => {
                     athr.input().pushbutton = true;
                 }
@@ -194,11 +198,19 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
                     let data = data.into::<Flight>(&sim).unwrap();
                     let input = athr.input();
                     input.airspeed = data.airspeed;
-                    input.altitude = data.altitude;
-                    input.airspeed_hold = data.airspeed_hold;
-                    input.altitude_lock = data.altitude_lock;
                     input.radio_height = data.radio_height;
-                    input.autopilot = data.autopilot;
+
+                    if data.autopilot && last_altitude_lock != data.altitude_lock {
+                        last_altitude_lock = data.altitude_lock;
+                        input.mode = if data.altitude_lock > data.altitude {
+                            athr::Mode::ThrustClimb
+                        } else {
+                            athr::Mode::ThrustDescent
+                        };
+                    }
+                    if !data.autopilot || (data.altitude_lock - data.altitude).abs() < 1000.0 {
+                        input.mode = athr::Mode::Speed;
+                    }
                 }
                 _ => unreachable!(),
             },
@@ -219,10 +231,7 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
             t
         };
 
-        let t1 = map(t1);
-        let t2 = map(t2);
-
-        athr.input().throttles = [t1, t2];
+        athr.input().throttles = [map(t1), map(t2)];
 
         athr.update();
 
@@ -232,8 +241,8 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
         {
             let output = athr.output();
             let odata = Output {
-                t1: output.commanded.min(t1),
-                t2: output.commanded.min(t2),
+                t1: output.commanded[0],
+                t2: output.commanded[1],
             };
 
             #[cfg(debug_assertions)]
