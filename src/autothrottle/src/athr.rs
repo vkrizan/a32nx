@@ -8,6 +8,18 @@ pub enum Mode {
     ThrustLock,
 }
 
+impl Mode {
+    /// override modes sustain command of the thrust by
+    /// themselves, even if athr would nomally deactivate.
+    fn is_override(&self) -> bool {
+        match self {
+            Mode::AlphaFloor => true,
+            Mode::ThrustLock => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct AutoThrottleInput {
     pub mode: Mode,
@@ -98,9 +110,12 @@ impl AutoThrottle {
         if self.output.active {
             self.active_logic(dt);
 
-            let m = |i: usize| match self.output.mode {
-                Mode::AlphaFloor | Mode::ThrustLock => self.commanded,
-                _ => self.input.throttles[i].min(self.commanded),
+            let m = |i: usize| {
+                if self.output.mode.is_override() {
+                    self.commanded
+                } else {
+                    self.input.throttles[i].min(self.commanded)
+                }
             };
 
             self.output.commanded = [m(0), m(1)];
@@ -180,10 +195,7 @@ impl AutoThrottle {
             || (false && (self.input.radio_height < 100.0 && self.input.throttles.iter().any(|t| *t > Gates::FLEX_MCT)))
             // Both throttle control levers placed in the IDLE position.
             // Both throttle control levers placed in the REVERSE position.
-            || match self.output.mode {
-                Mode::AlphaFloor | Mode::ThrustLock => false,
-                _ => !self.input.alpha_floor && self.input.throttles.iter().all(|t| *t <= Gates::IDLE),
-            };
+            || (!self.output.mode.is_override() && !self.input.alpha_floor && self.input.throttles.iter().all(|t| *t <= Gates::IDLE));
 
         // SR flip-flop
         self.output.armed = if s {
@@ -198,7 +210,8 @@ impl AutoThrottle {
         self.output.active = self.output.armed
             && (
                 // the Alpha floor protection is active whatever the position of the throttle control levers.
-                (self.input.alpha_floor || self.output.mode == Mode::AlphaFloor || self.output.mode == Mode::ThrustLock)
+                self.input.alpha_floor
+                || self.output.mode.is_override()
                 // one throttle control lever is between IDLE and CL (including CL), and the other
                 // is between IDLE and MCT (including MCT) with FLEX TO limit mode not selected.
                 || (one_engine_cond && false)
