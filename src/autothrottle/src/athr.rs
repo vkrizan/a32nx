@@ -14,7 +14,7 @@ pub struct AutoThrottleInput {
     pub airspeed: f64,
     pub airspeed_target: f64,
     pub vls: f64,
-    pub alpha_prot: f64,
+    pub alpha_floor: bool,
     pub radio_height: f64,
     pub pushbutton: bool,
     pub instinctive_disconnect: bool,
@@ -79,7 +79,7 @@ impl AutoThrottle {
                 airspeed: 0.0,
                 airspeed_target: 0.0,
                 vls: 0.0,
-                alpha_prot: 0.0,
+                alpha_floor: false,
                 radio_height: 0.0,
                 pushbutton: false,
                 instinctive_disconnect: false,
@@ -143,11 +143,6 @@ impl AutoThrottle {
             Instinctive::Lockout => false,
         };
 
-        // is in alpha floor zone, should theoretically only be reachable
-        // with aft sidestick, but this may require some communication
-        // with fbw system to prevent accidentaly activation.
-        let alpha_floor_cond = self.input.airspeed < self.input.alpha_prot;
-
         let one_engine_cond = false;
 
         let athr_common_or_specific = ap_fd_athr_common_cond || athr_specific_cond;
@@ -157,7 +152,7 @@ impl AutoThrottle {
                 self.input.pushbutton
                 // TOGA condition
                 || self.input.throttles.iter().all(|t| *t == Gates::FLEX_MCT || *t == Gates::TOGA)
-                || alpha_floor_cond
+                || self.input.alpha_floor
             );
 
         let r = !athr_common_or_specific
@@ -194,7 +189,7 @@ impl AutoThrottle {
         self.output.active = self.output.armed
             && (
                 // the Alpha floor protection is active whatever the position of the throttle control levers.
-                alpha_floor_cond
+                self.input.alpha_floor
                 // one throttle control lever is between IDLE and CL (including CL), and the other
                 // is between IDLE and MCT (including MCT) with FLEX TO limit mode not selected.
                 || (one_engine_cond && false)
@@ -203,7 +198,7 @@ impl AutoThrottle {
             );
 
         if self.output.active {
-            self.output.mode = if alpha_floor_cond {
+            self.output.mode = if self.input.alpha_floor {
                 Mode::AlphaFloor
             } else {
                 match self.output.mode {
