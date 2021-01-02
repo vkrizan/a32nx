@@ -198,6 +198,9 @@ pub async fn module(mut module: msfs::StandaloneModule) -> Result<(), Box<dyn st
                     let data = data.into::<Flight>(&sim).unwrap();
                     let input = athr.input();
                     input.airspeed = data.airspeed;
+                    input.airspeed_target = data.airspeed_hold;
+                    // input.vls = ?;
+                    // input.alpha_prot = ?;
                     input.radio_height = data.radio_height;
 
                     if data.autopilot && last_altitude_lock != data.altitude_lock {

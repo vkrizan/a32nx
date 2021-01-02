@@ -13,9 +13,17 @@ pub struct AutoThrottleInput {
     pub throttles: [f64; 2],
     pub airspeed: f64,
     pub airspeed_target: f64,
+    pub vls: f64,
+    pub alpha_prot: f64,
     pub radio_height: f64,
     pub pushbutton: bool,
     pub instinctive_disconnect: bool,
+}
+
+impl AutoThrottleInput {
+    fn target_airspeed(&self) -> f64 {
+        self.airspeed_target.max(self.vls)
+    }
 }
 
 #[derive(Debug)]
@@ -70,6 +78,8 @@ impl AutoThrottle {
                 throttles: [0.0, 0.0],
                 airspeed: 0.0,
                 airspeed_target: 0.0,
+                vls: 0.0,
+                alpha_prot: 0.0,
                 radio_height: 0.0,
                 pushbutton: false,
                 instinctive_disconnect: false,
@@ -137,7 +147,7 @@ impl AutoThrottle {
         };
 
         // is in alpha floor zone
-        let alpha_floor_cond = false;
+        let alpha_floor_cond = self.input.airspeed < self.input.alpha_prot;
 
         let one_engine_cond = false;
 
@@ -215,7 +225,7 @@ impl AutoThrottle {
 
             if self.input.mode != self.output.mode && self.output.mode == Mode::Speed {
                 self.speed_mode_pid.reset(
-                    self.input.airspeed_target,
+                    self.input.target_airspeed(),
                     self.input.airspeed,
                     self.last_t.elapsed().as_secs_f64(),
                     self.commanded,
@@ -232,7 +242,7 @@ impl AutoThrottle {
         self.commanded = match self.output.mode {
             Mode::Speed => self.thrust_rate_limiter.iterate(
                 self.speed_mode_pid
-                    .update(self.input.airspeed_target, self.input.airspeed, dt),
+                    .update(self.input.target_airspeed(), self.input.airspeed, dt),
                 10.0,
                 10.0,
                 dt,
