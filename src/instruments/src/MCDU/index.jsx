@@ -33,17 +33,17 @@ function SelfTest() {
     );
 }
 
-function Idle(props) {
-    const { fmgc } = props;
+function Idle({ fmgc }) {
+    useUpdate(() => {
+        fmgc.update();
+    });
 
     return (
-        <>
-            <svg className="mcdu-svg" viewBox="0 0 600 600">
-                <Titlebar />
-                <PagesContainer fmgc={fmgc} />
-                <Scratchpad />
-            </svg>
-        </>
+        <svg className="main-wrapper" viewBox="0 0 1024 1024">
+            <Titlebar />
+            <PagesContainer fmgc={fmgc} />
+            <Scratchpad />
+        </svg>
     );
 }
 
@@ -51,14 +51,18 @@ Idle.propTypes = {
     fmgc: PropTypes.instanceOf(FMGC).isRequired,
 };
 
-function MCDU() {
+const MCDU = () => {
     const [state, setState] = useState('DEFAULT');
-    const Core = new FMGC();
+    const [fmgc, setFmgc] = useState(() => {
+        const temp = new FMGC();
+        temp.Init();
+        return temp;
+    });
+
     useUpdate((_deltaTime) => {
         if (state === 'OFF') {
             if (powerAvailable()) {
                 setState('ON');
-                Core.Init(_deltaTime);
             }
         } else if (!powerAvailable()) {
             setState('OFF');
@@ -83,10 +87,10 @@ function MCDU() {
         }, 5000);
         return <SelfTest />;
     case 'IDLE':
-        return <Idle fmgc={Core} />;
+        return <Idle fmgc={fmgc} />;
     default:
         throw new RangeError();
     }
-}
+};
 
 ReactDOM.render(<MCDU />, renderTarget);

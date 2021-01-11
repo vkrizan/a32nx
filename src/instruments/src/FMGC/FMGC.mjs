@@ -1,4 +1,5 @@
 import A32NX_Core from '../A32NX_Core/A32NX_Core.mjs';
+import NXDataStore from '../A32NX_Utils/NXDataStore.mjs';
 
 const fuelPlanningPhases = {
     PLANNING: 1,
@@ -23,38 +24,38 @@ const activeSystems = {
 
 // TODO find a way to include FMCMainDisplay
 
-class FMGC extends FMCMainDisplay {
+class FMGC {
     constructor() {
-        super(...arguments);
+        this._A32NXCore = new A32NX_Core();
         this._registered = false;
         this._forceNextAltitudeUpdate = false;
         this._lastUpdateAPTime = NaN;
-        this.refreshFlightPlanCooldown = 0;
-        this.updateAutopilotCooldown = 0;
+        this._refreshFlightPlanCooldown = 0;
+        this._updateAutopilotCooldown = 0;
         this._lastHasReachFlex = false;
         this._apMasterStatus = false;
         this._hasReachedTopOfDescent = false;
         this._apCooldown = 500;
         this._lastRequestedFLCModeWaypointIndex = -1;
-        this.messages = [];
-        this.sentMessages = [];
-        this.activeSystem = 'FMGC';
+        this._messages = [];
+        this._sentMessages = [];
+        this._activeSystem = 'FMGC';
         this._cruiseEntered = false;
         this._blockFuelEntered = false;
         this._gpsprimaryack = 0;
-        this.currentFlightPhase = FlightPhase.FLIGHT_PHASE_PREFLIGHT;
-        this.activeWaypointIdx = -1;
-        this.constraintAlt = 0;
-        this.constraintAltCached = 0;
-        this.fcuSelAlt = 0;
-        this.updateTypeIIMessage = false;
-        this.altLock = 0;
-        this.messageQueue = [];
+        this._currentFlightPhase = FlightPhase.FLIGHT_PHASE_PREFLIGHT;
+        this._activeWaypointIdx = -1;
+        this._constraintAlt = 0;
+        this._constraintAltCached = 0;
+        this._fcuSelAlt = 0;
+        this._updateTypeIIMessage = false;
+        this._altLock = 0;
+        this._messageQueue = [];
         this._destDataChecked = false;
         this._towerHeadwind = 0;
         this._conversionWeight = parseFloat(NXDataStore.get('CONFIG_USING_METRIC_UNIT', '1'));
         this._EfobBelowMinClr = false;
-        this.simbrief = {
+        this._simbrief = {
             route: '',
             cruiseAltitude: '',
             originIcao: '',
@@ -78,34 +79,26 @@ class FMGC extends FMCMainDisplay {
             taxiFuel: '',
             tripFuel: '',
         };
-        this.aocWeight = {
+        this._aocWeight = {
             blockFuel: undefined,
             estZfw: undefined,
             taxiFuel: undefined,
             tripFuel: undefined,
             payload: undefined,
         };
-        this.aocTimes = {
+        this._aocTimes = {
             doors: 0,
             off: 0,
             out: 0,
             on: 0,
             in: 0,
         };
-        this.winds = {
+        this._winds = {
             climb: [],
             cruise: [],
             des: [],
             alternate: null,
         };
-    }
-
-    getVh1Frequency() {
-        return this._radios.vhf1Frequency;
-    }
-
-    setVh1Frequency(value) {
-        this._radios.vhf1Frequency = value;
     }
 
     getActiveSystem() {
@@ -116,19 +109,12 @@ class FMGC extends FMCMainDisplay {
         this._activeSystem = value;
     }
 
-    getMinDestFob() {
-        return this._minDestFob;
-    }
-
-    setMinDestFOB(value) {
-        this._minDestFob = value;
-    }
-
     Init(_deltaTime) {
-        super.Init();
-
-        this._A32NXCore = new A32NX_Core();
         this._A32NXCore.init(_deltaTime);
+    }
+
+    update() {
+        this._A32NXCore.update();
     }
 }
 
