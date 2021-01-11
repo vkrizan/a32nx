@@ -19,21 +19,21 @@ impl RateLimiter {
         self.out = [i, i];
     }
 
-    pub fn iterate(&mut self, i: f64, a_rate: f64, d_rate: f64, dt: f64) -> f64 {
+    pub fn iterate(&mut self, i: f64, rate: f64, dt: f64) -> f64 {
         self.in_[0] = i;
 
         let slope = (self.in_[0] - self.out[1]) / dt;
 
-        if slope <= -d_rate {
-            self.y_slope = -d_rate;
+        if slope <= -rate {
+            self.y_slope = -rate;
         }
 
-        if -d_rate <= slope && slope <= a_rate {
+        if -rate <= slope && slope <= rate {
             self.y_slope = slope;
         }
 
-        if a_rate <= slope {
-            self.y_slope = a_rate;
+        if rate <= slope {
+            self.y_slope = rate;
         }
 
         self.out[0] = self.out[1] + (dt * self.y_slope);

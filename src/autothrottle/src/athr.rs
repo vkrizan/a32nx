@@ -266,7 +266,6 @@ impl AutoThrottle {
                 self.speed_mode_pid
                     .update(self.input.target_airspeed(), self.input.airspeed, dt),
                 10.0,
-                10.0,
                 dt,
             ),
             Mode::ThrustClimb | Mode::ThrustDescent => self.thrust_rate_limiter.iterate(
@@ -275,7 +274,6 @@ impl AutoThrottle {
                 } else {
                     0.0
                 },
-                4.0,
                 4.0,
                 dt,
             ),

@@ -34,19 +34,18 @@ impl PID {
     pub(crate) fn update(&mut self, setpoint: f64, value: f64, dt: f64) -> f64 {
         // Calculate rollup parameters
         let k: f64 = 2.0 / dt;
-        let b0 = k.powf(2.0) * self.kp
+        let k2 = k.powf(2.0);
+        let b0 = k2 * self.kp
             + k * self.ki
             + self.ki * self.n
             + k * self.kp * self.n
-            + k.powf(2.0) * self.kd * self.n;
-        let b1 = 2.0 * self.ki * self.n
-            - 2.0 * k.powf(2.0) * self.kp
-            - 2.0 * k.powf(2.0) * self.kd * self.n;
-        let b2 = k.powf(2.0) * self.kp - k * self.ki + self.ki * self.n - k * self.kp * self.n
-            + k.powf(2.0) * self.kd * self.n;
-        let a0 = k.powf(2.0) + self.n * k;
-        let a1 = -2.0 * k.powf(2.0);
-        let a2 = k.powf(2.0) - k * self.n;
+            + k2 * self.kd * self.n;
+        let b1 = 2.0 * self.ki * self.n - 2.0 * k2 * self.kp - 2.0 * k2 * self.kd * self.n;
+        let b2 = k2 * self.kp - k * self.ki + self.ki * self.n - k * self.kp * self.n
+            + k2 * self.kd * self.n;
+        let a0 = k2 + self.n * k;
+        let a1 = -2.0 * k2;
+        let a2 = k2 - k * self.n;
 
         // Age errors and output history
         self.e[2] = self.e[1]; // Age errors one iteration
